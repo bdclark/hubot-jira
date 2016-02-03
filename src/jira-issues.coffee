@@ -83,29 +83,60 @@ module.exports = (robot) ->
             robot.http(jiraUrl + "/rest/api/2/issue/" + issue)
               .auth(auth)
               .get() (err, res, body) ->
-                try
+                # try
                   json = JSON.parse(body)
                   key = json.key
-
-                  message = "[" + key + "] " + json.fields.summary
-                  message += '\nStatus: '+json.fields.status.name
+                  issueUrl = jiraUrl + "/browse/" + key
+                  issueType = json.fields.issuetype.name
+                  status = json.fields.status.name
+                  summary = json.fields.summary
+                  reporter = json.fields.reporter.displayName
+                  priority = json.fields.priority.name
                   if (json.fields.assignee and json.fields.assignee.displayName)
-                    message += ', assigned to ' + json.fields.assignee.displayName
+                    assignee = json.fields.assignee.displayName
                   else
-                    message += ', unassigned'
-                  message += ", rep. by "+json.fields.reporter.displayName
-                  if json.fields.fixVersions and json.fields.fixVersions.length > 0
-                    message += ', fixVersion: '+json.fields.fixVersions[0].name
-                  else
-                    message += ', fixVersion: NONE'
+                    assignee = 'unassigned'
+                  # if json.fields.fixVersions and json.fields.fixVersions.length > 0
+                  #   fixVersion = json.fields.fixVersions[0].name
+                  # else
+                  #   fixVersion = 'NONE'
 
-                  msg.send message
+                  message = "[" + key + "] " + summary
+                  message += '\nStatus: ' + status
+                  message += ' | Assignee: ' + assignee
+                  message += ' | Created by: ' + reporter
+                  # message += ', fixVersion: ' + fixVersion
 
-                  urlRegex = new RegExp(jiraUrl + "[^\\s]*" + key)
-                  if not msg.message.text.match(urlRegex)
-                    msg.send jiraUrl + "/browse/" + key
-                catch error
-                  try
-                    msg.send "[*ERROR*] " + json.errorMessages[0]
-                  catch reallyError
-                    msg.send "[*ERROR*] " + reallyError
+                  # msg.send message + '\n' + issueUrl
+                  text = "*Type:* :jira_#{issueType}: " + issueType
+                  text += " | *Reporter:* " + reporter
+                  text += " | *Assignee:* " + assignee
+                  text += " | *Priority:* :jira_#{priority}: " + priority
+                  # text += " | *FixVersion:* " + fixVersion
+                  text += " | *Status:* " + status
+
+                  color = switch
+                    when priority is "Minor" then 'good'
+                    when priority is "Major" then 'warning'
+                    when priority is "Critical" or "Blocker" then 'danger'
+                    else '#28D7E5'
+                  robot.emit 'slack.attachment',
+                    fallback: message
+                    message: msg.message
+                    username: 'Jira'
+                    icon_emoji: ':jira:'
+                    content:
+                      title: key + ': ' + summary
+                      title_link: issueUrl
+                      color: color
+                      text: text
+                      mrkdwn_in: ['text']
+
+                  # urlRegex = new RegExp(jiraUrl + "[^\\s]*" + key)
+                  # if not msg.message.text.match(urlRegex)
+                  #   msg.send jiraUrl + "/browse/" + key
+                # catch error
+                #   try
+                #     msg.send "[*ERROR*] " + json.errorMessages[0]
+                #   catch reallyError
+                #     msg.send "[*ERROR*] " + reallyError
