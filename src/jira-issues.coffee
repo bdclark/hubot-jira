@@ -71,9 +71,10 @@ module.exports = (robot) ->
       robot.hear /jira status/, (msg) ->
         robot.http(jiraUrl + "/rest/api/2/status")
         .auth(auth).get() (err, res, body) ->
-          response = "/code "
+          response = "```"
           for status in JSON.parse(body)
             response += status.name + ": " + status.description + '\n'
+          response += "```"
           msg.send response
 
       robot.hear jiraPattern, (msg) ->
