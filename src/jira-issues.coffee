@@ -83,7 +83,7 @@ module.exports = (robot) ->
             robot.http(jiraUrl + "/rest/api/2/issue/" + issue)
               .auth(auth)
               .get() (err, res, body) ->
-                # try
+                try
                   json = JSON.parse(body)
                   key = json.key
                   issueUrl = jiraUrl + "/browse/" + key
@@ -92,34 +92,41 @@ module.exports = (robot) ->
                   summary = json.fields.summary
                   reporter = json.fields.reporter.displayName
                   priority = json.fields.priority.name
-                  if (json.fields.assignee and json.fields.assignee.displayName)
-                    assignee = json.fields.assignee.displayName
+                  if (json.fields.assignee == null)
+                    assignee = 'unassigned'
+                  else if ('value' of json.fields.assignee or 'displayName' of json.fields.assignee)
+                    if (json.fields.assignee.name == "assignee" and json.fields.assignee.value.displayName)
+                      assignee = json.fields.assignee.value.displayName
+                    else if (json.fields.assignee and json.fields.assignee.displayName)
+                      assignee = json.fields.assignee.displayName
                   else
                     assignee = 'unassigned'
-                  # if json.fields.fixVersions and json.fields.fixVersions.length > 0
-                  #   fixVersion = json.fields.fixVersions[0].name
-                  # else
-                  #   fixVersion = 'NONE'
+                  if json.fields.fixVersions and json.fields.fixVersions.length > 0
+                    fixVersion = json.fields.fixVersions[0].name
+                  else
+                    fixVersion = 'NONE'
 
                   message = "[" + key + "] " + summary
                   message += '\nStatus: ' + status
+                  message += ' | Reporter: ' + reporter
                   message += ' | Assignee: ' + assignee
-                  message += ' | Created by: ' + reporter
-                  # message += ', fixVersion: ' + fixVersion
+                  message += ' | Priority: ' + priority
+                  message += ' | Status: ' + status
+                  message += ' | FixVersion: ' + fixVersion unless fixVersion == 'NONE'
 
-                  # msg.send message + '\n' + issueUrl
                   text = "*Type:* :jira_#{issueType}: " + issueType
                   text += " | *Reporter:* " + reporter
                   text += " | *Assignee:* " + assignee
                   text += " | *Priority:* :jira_#{priority}: " + priority
-                  # text += " | *FixVersion:* " + fixVersion
                   text += " | *Status:* " + status
+                  text += " | *FixVersion:* " + fixVersion unless fixVersion == 'NONE'
 
                   color = switch
                     when priority is "Minor" then 'good'
                     when priority is "Major" then 'warning'
                     when priority is "Critical" or "Blocker" then 'danger'
                     else '#28D7E5'
+
                   robot.emit 'slack.attachment',
                     fallback: message
                     message: msg.message
@@ -134,9 +141,12 @@ module.exports = (robot) ->
 
                   # urlRegex = new RegExp(jiraUrl + "[^\\s]*" + key)
                   # if not msg.message.text.match(urlRegex)
-                  #   msg.send jiraUrl + "/browse/" + key
-                # catch error
-                #   try
-                #     msg.send "[*ERROR*] " + json.errorMessages[0]
-                #   catch reallyError
-                #     msg.send "[*ERROR*] " + reallyError
+                  #   message += "\n" + jiraUrl + "/browse/" + key
+                  # 
+                  # msg.send message
+                  # cache.push({issue: issue, expires: now + 120000, message: message})
+                catch error
+                  try
+                    msg.send "[*ERROR*] " + json.errorMessages[0]
+                  catch reallyError
+                    msg.send "[*ERROR*] " + reallyError
